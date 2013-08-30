@@ -58,9 +58,12 @@ class StructuredModel(object):
         # hamming loss:
         if isinstance(y_hat, tuple):
             return self.continuous_loss(y, y_hat[0])
+        losses = y != y_hat
         if hasattr(self, 'class_weight'):
-            return np.sum(self.class_weight[y] * (y != y_hat))
-        return np.sum(y != y_hat)
+            losses = self.class_weight[y] * losses
+        if getattr(self, 'normalize_loss', False):
+            return np.mean(losses)
+        return np.sum(losses)
 
     def batch_loss(self, Y, Y_hat):
         # default implementation of batch loss
@@ -82,7 +85,9 @@ class StructuredModel(object):
         # all entries minus correct ones
         result = 1 - y_hat[gx, y]
         if hasattr(self, 'class_weight'):
-            return np.sum(self.class_weight[y] * result)
+            result = self.class_weight[y] * result
+        if getattr(self, 'normalize_loss', False):
+            return np.mean(result)
         return np.sum(result)
 
     def loss_augmented_inference(self, x, y, w, relaxed=None):

@@ -8,7 +8,7 @@ from .utils import loss_augment_unaries
 class CRF(StructuredModel):
     """Abstract base class"""
     def __init__(self, n_states=None, n_features=None, inference_method=None,
-                 class_weight=None):
+                 class_weight=None, normalize_loss=True):
         self.n_states = n_states
         if inference_method is None:
             # get first in list that is installed
@@ -17,6 +17,7 @@ class CRF(StructuredModel):
         self.inference_calls = 0
         self.n_features = n_features
         self.class_weight = class_weight
+        self.normalize_loss = normalize_loss
         self._set_size_psi()
         self._set_class_weight()
 
@@ -103,7 +104,8 @@ class CRF(StructuredModel):
         unary_potentials = self._get_unary_potentials(x, w)
         pairwise_potentials = self._get_pairwise_potentials(x, w)
         edges = self._get_edges(x)
-        loss_augment_unaries(unary_potentials, np.asarray(y), self.class_weight)
+        y = np.asarray(y)
+        loss_augment_unaries(unary_potentials, np.asarray(y), self.class_weight / len(y))
 
         return inference_dispatch(unary_potentials, pairwise_potentials, edges,
                                   self.inference_method, relaxed=relaxed,
