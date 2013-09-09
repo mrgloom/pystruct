@@ -155,7 +155,7 @@ class FrankWolfeSSVM(BaseSSVM):
         n_samples = float(len(X))
         psi_gt = self.model.batch_psi(X, Y, Y)
 
-        for k in xrange(self.max_iter):
+        for iteration in xrange(self.max_iter):
             Y_hat = self.model.batch_loss_augmented_inference(X, Y, self.w,
                                                               relaxed=True)
             dpsi = psi_gt - self.model.batch_psi(X, Y_hat)
@@ -171,7 +171,7 @@ class FrankWolfeSSVM(BaseSSVM):
                 gamma = dual_gap / (np.sum(w_diff ** 2) / (self.C * n_samples) + eps)
                 gamma = max(0.0, min(1.0, gamma))
             else:
-                gamma = 2.0 / (k + 2.0)
+                gamma = 2.0 / (iteration + 2.0)
 
             dual_val = -0.5 * np.sum(self.w ** 2) + l * (n_samples * self.C)
             dual_gap_display = dual_gap * n_samples * self.C
@@ -181,15 +181,15 @@ class FrankWolfeSSVM(BaseSSVM):
             self.objective_curve_.append(dual_val)
             self.timestamps_.append(time() - self.timestamps_[0])
             if self.verbose > 0:
-                print("k = %d, dual: %f, dual_gap: %f, primal: %f, gamma: %f"
-                      % (k, dual_val, dual_gap_display, primal_val, gamma))
+                print("iteration %d, dual: %f, dual_gap: %f, primal: %f, gamma: %f"
+                      % (iteration, dual_val, dual_gap_display, primal_val, gamma))
 
             # update w and l
             self.w = (1.0 - gamma) * self.w + gamma * ws
             l = (1.0 - gamma) * l + gamma * ls
 
             if self.logger is not None:
-                self.logger(self, k)
+                self.logger(self, iteration)
 
             if dual_gap < self.tol:
                 return
@@ -208,9 +208,9 @@ class FrankWolfeSSVM(BaseSSVM):
         k = 0
 
         rng = check_random_state(self.random_state)
-        for p in xrange(self.max_iter):
+        for iteration in xrange(self.max_iter):
             if self.verbose > 0:
-                print("Iteration %d" % p)
+                print("Iteration %d" % iteration)
 
             perm = np.arange(n_samples)
             if self.sample_method == 'perm':
@@ -252,8 +252,8 @@ class FrankWolfeSSVM(BaseSSVM):
                 k += 1
 
             if self.logger is not None:
-                self.logger(self, p)
-            if (self.check_dual_every != 0) and (p % self.check_dual_every == 0):
+                self.logger(self, iteration)
+            if (self.check_dual_every != 0) and (iteration % self.check_dual_every == 0):
                 dual_val, dual_gap, primal_val = self._calc_dual_gap(X, Y, l)
                 self.primal_objective_curve_.append(primal_val)
                 self.objective_curve_.append(dual_val)
@@ -302,5 +302,4 @@ class FrankWolfeSSVM(BaseSSVM):
         self.objective_curve_.append(self.objective_curve_[-1])
         if self.logger is not None:
             self.logger(self, 'final')
-
         return self
