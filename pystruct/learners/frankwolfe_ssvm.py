@@ -73,8 +73,8 @@ class FrankWolfeSSVM(BaseSSVM):
         the stopping criterion is as costly as doing one pass over the dataset,
         so check_dual_every=1 will make learning twice as slow.
 
-    do_averaging : bool, default=True
-        Whether to use weight averaging as described in the reference paper.
+    averaging : string, default='linear'
+        Whether and how to average weights. Possible options are 'linear', 'squared' and 'none'.
         Currently this is only supported in the block-coordinate version.
 
     random_state : int, RandomState instance or None, optional (default=None)
@@ -104,7 +104,7 @@ class FrankWolfeSSVM(BaseSSVM):
     def __init__(self, model, max_iter=1000, C=1.0, verbose=0, n_jobs=1,
                  show_loss_every=0, logger=None, batch_mode=False,
                  line_search=True, check_dual_every=10, tol=.001,
-                 do_averaging=True, sample_method='perm', random_state=None):
+                 averaging=True, sample_method='perm', random_state=None):
 
         if n_jobs != 1:
             warnings.warn("FrankWolfeSSVM does not support multiprocessing"
@@ -120,7 +120,7 @@ class FrankWolfeSSVM(BaseSSVM):
         self.batch_mode = batch_mode
         self.line_search = line_search
         self.check_dual_every = check_dual_every
-        self.do_averaging = do_averaging
+        self.averaging = averaging
         self.sample_method = sample_method
         self.random_state = random_state
 
@@ -203,7 +203,6 @@ class FrankWolfeSSVM(BaseSSVM):
         w = self.w.copy()
         w_mat = np.zeros((n_samples, self.model.size_psi))
         l_mat = np.zeros(n_samples)
-        l_avg = 0.0
         l = 0.0
         k = 0
 
@@ -243,10 +242,12 @@ class FrankWolfeSSVM(BaseSSVM):
                 l_mat[i] = (1.0 - gamma) * l_mat[i] + gamma * ls
                 l += l_mat[i]
 
-                if self.do_averaging:
-                    rho = 2.0 / (k + 2.0)
-                    self.w = (1.0 - rho) * self.w + rho * w
-                    l_avg = (1.0 - rho) * l_avg + rho * l
+                if self.averaging == 'linear':
+                    rho = 2. / (k + 2.)
+                    self.w = (1. - rho) * self.w + rho * w
+                elif self.averaging == 'squared':
+                    rho = 6. * (k + 1) / ((k + 2) * (2 * k + 3))
+                    self.w = (1. - rho) * self.w + rho * w
                 else:
                     self.w = w
                 k += 1
