@@ -92,7 +92,7 @@ class FrankWolfeSSVM(BaseSSVM):
     ``loss_curve_`` : list of float
         List of loss values if show_loss_every > 0.
 
-    ``objective_curve_`` : list of float
+    ``dual_objective_curve_`` : list of float
        Cutting plane objective after each pass through the dataset.
 
     ``primal_objective_curve_`` : list of float
@@ -139,7 +139,7 @@ class FrankWolfeSSVM(BaseSSVM):
         dual_gap = w_diff.T.dot(self.w) - l + ls * self.C
         primal_val = dual_val + dual_gap
         self.primal_objective_curve_.append(primal_val)
-        self.objective_curve_.append(dual_val)
+        self.dual_objective_curve_.append(dual_val)
         self.timestamps_.append(time() - self.timestamps_[0])
         return dual_val, dual_gap, primal_val
 
@@ -178,7 +178,7 @@ class FrankWolfeSSVM(BaseSSVM):
             primal_val = dual_val + dual_gap_display
 
             self.primal_objective_curve_.append(primal_val)
-            self.objective_curve_.append(dual_val)
+            self.dual_objective_curve_.append(dual_val)
             self.timestamps_.append(time() - self.timestamps_[0])
             if self.verbose > 0:
                 print("k = %d, dual: %f, dual_gap: %f, primal: %f, gamma: %f"
@@ -257,7 +257,7 @@ class FrankWolfeSSVM(BaseSSVM):
             if (self.check_dual_every != 0) and (p % self.check_dual_every == 0):
                 dual_val, dual_gap, primal_val = self._calc_dual_gap(X, Y, l)
                 self.primal_objective_curve_.append(primal_val)
-                self.objective_curve_.append(dual_val)
+                self.dual_objective_curve_.append(dual_val)
                 self.timestamps_.append(time() - self.timestamps_[0])
                 if self.verbose > 0:
                     print("dual: %f, dual_gap: %f, primal: %f"
@@ -286,7 +286,7 @@ class FrankWolfeSSVM(BaseSSVM):
         """
         if initialize:
             self.model.initialize(X, Y)
-        self.objective_curve_, self.primal_objective_curve_ = [], []
+        self.dual_objective_curve_, self.primal_objective_curve_ = [], []
         self.timestamps_ = [time()]
         self.w = getattr(self, "w", np.zeros(self.model.size_psi))
         try:
@@ -300,7 +300,7 @@ class FrankWolfeSSVM(BaseSSVM):
             print("Calculating final objective.")
         self.timestamps_.append(time() - self.timestamps_[0])
         self.primal_objective_curve_.append(self._objective(X, Y))
-        self.objective_curve_.append(self.objective_curve_[-1])
+        self.dual_objective_curve_.append(self.dual_objective_curve_[-1])
         if self.logger is not None:
             self.logger(self, 'final')
 
