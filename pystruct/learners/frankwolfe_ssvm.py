@@ -138,9 +138,6 @@ class FrankWolfeSSVM(BaseSSVM):
         w_diff = self.w - ws
         dual_gap = w_diff.T.dot(self.w) - l + ls * self.C
         primal_val = dual_val + dual_gap
-        self.primal_objective_curve_.append(primal_val)
-        self.dual_objective_curve_.append(dual_val)
-        self.timestamps_.append(time() - self.timestamps_[0])
         return dual_val, dual_gap, primal_val
 
     def _frank_wolfe_batch(self, X, Y):
@@ -205,9 +202,11 @@ class FrankWolfeSSVM(BaseSSVM):
         l_mat = np.zeros(n_samples)
         l = 0.0
         k = 0
+        self.iterations_ = []
 
         rng = check_random_state(self.random_state)
         for p in xrange(self.max_iter):
+            self._iteration = p
             if self.verbose > 0:
                 print("Iteration %d" % p)
 
@@ -259,6 +258,7 @@ class FrankWolfeSSVM(BaseSSVM):
                 self.primal_objective_curve_.append(primal_val)
                 self.dual_objective_curve_.append(dual_val)
                 self.timestamps_.append(time() - self.timestamps_[0])
+                self.iterations_.append(p)
                 if self.verbose > 0:
                     print("dual: %f, dual_gap: %f, primal: %f"
                           % (dual_val, dual_gap, primal_val))
@@ -301,6 +301,8 @@ class FrankWolfeSSVM(BaseSSVM):
         self.timestamps_.append(time() - self.timestamps_[0])
         self.primal_objective_curve_.append(self._objective(X, Y))
         self.dual_objective_curve_.append(self.dual_objective_curve_[-1])
+        if hasattr(self, "iterations_"):
+            self.iterations_.append(self._iteration)
         if self.logger is not None:
             self.logger(self, 'final')
 
