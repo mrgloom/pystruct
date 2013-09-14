@@ -282,7 +282,6 @@ class NSlackSSVM(BaseSSVM):
             # we have to update at least once after going through the dataset
             for iteration in xrange(self.max_iter):
                 # main loop
-                self.timestamps_.append(time() - self.timestamps_[0])
                 if self.verbose > 0:
                     print("iteration %d" % iteration)
                 if self.verbose > 2:
@@ -338,6 +337,7 @@ class NSlackSSVM(BaseSSVM):
                         new_constraints += new_constraints_batch
 
                 self.dual_objective_curve_.append(objective)
+                self.timestamps_.append(time() - self.timestamps_[0])
                 self._compute_training_loss(X, Y, iteration)
 
                 primal_objective = (self.C
