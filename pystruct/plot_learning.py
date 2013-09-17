@@ -121,7 +121,7 @@ def plot_learning(ssvm, time=True, axes=None, prefix="", color=None,
         else:
             ssvm.dual_objective_curve_ = np.array(ssvm.dual_objective_curve_)[inference_run]
             primal_objective_curve = primal_objective_curve[inference_run]
-            ssvm.timestamps_ = [ssvm.timestamps_[0]] + ssvm.timestamps_[1:][inference_run]
+            ssvm.timestamps_ = np.hstack([ssvm.timestamps_[0], ssvm.timestamps_[1:][inference_run]])
     else:
         show_caching = False
 
