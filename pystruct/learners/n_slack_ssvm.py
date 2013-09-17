@@ -46,6 +46,10 @@ class NSlackSSVM(BaseSSVM):
     verbose : int (default=0)
         Verbosity.
 
+    compute_objective_every: int (default=0)
+        How often to recompute the primal objective on the full dataset.
+        If 0 (default), a running approximation is used instead.
+
     negativity_constraint: list of ints
         Indices of parmeters that are constraint to be negative.
         This is useful for learning submodular CRFs (inference is formulated
@@ -114,7 +118,7 @@ class NSlackSSVM(BaseSSVM):
                  verbose=0, negativity_constraint=None, n_jobs=1,
                  break_on_bad=False, show_loss_every=0, batch_size=100,
                  tol=1e-3, inactive_threshold=1e-5,
-                 inactive_window=50, logger=None, switch_to=None):
+                 inactive_window=50, logger=None, switch_to=None, compute_objective_every=0):
 
         BaseSSVM.__init__(self, model, max_iter, C, verbose=verbose,
                           n_jobs=n_jobs, show_loss_every=show_loss_every,
@@ -128,6 +132,7 @@ class NSlackSSVM(BaseSSVM):
         self.inactive_threshold = inactive_threshold
         self.inactive_window = inactive_window
         self.switch_to = switch_to
+        self.compute_objective_every = compute_objective_every
 
     @property
     @deprecated("Attribute objective_curve was renamed to"
@@ -339,16 +344,22 @@ class NSlackSSVM(BaseSSVM):
                 self.dual_objective_curve_.append(objective)
                 self.timestamps_.append(time() - self.timestamps_[0])
                 self._compute_training_loss(X, Y, iteration)
-
-                primal_objective = (self.C
-                                    * slack_sum
-                                    + np.sum(self.w ** 2) / 2)
-                self.primal_objective_curve_.append(primal_objective)
+                if self.compute_objective_every and not iteration % self.compute_objective_every:
+                    self.primal_objective_curve_.append(self._objective(X, Y))
+                    if self.verbose:
+                        print("primal objective: %f" % self.primal_objective_curve_[-1])
+                else:
+                    primal_objective = (self.C
+                                        * slack_sum
+                                        + np.sum(self.w ** 2) / 2)
+                    self.primal_objective_curve_.append(primal_objective)
+                    if self.verbose:
+                        print("approximate primal objective: %f" % self.primal_objective_curve_[-1])
 
                 if self.verbose > 0:
                     print("new constraints: %d, "
-                          "cutting plane objective: %f primal objective: %f" %
-                          (new_constraints, objective, primal_objective))
+                          "cutting plane objective: %f" %
+                          (new_constraints, objective))
 
                 if new_constraints == 0:
                     print("no additional constraints")
