@@ -8,6 +8,25 @@ import numpy as np
 
 from pystruct.utils import SaveLogger
 
+def halton(index, base):
+       result = 0
+       f = 1. / base
+       i = index
+       while(i > 0):
+           result = result + f * (i % base)
+           i = np.floor(i / base)
+           f = f / base
+       return result
+
+
+def get_color(offset=0):
+    i = 0
+    while True:
+        c1 = halton(i + offset, 2)
+        c2 = halton(i + offset, 3)
+        c3 = halton(i + offset, 5)
+        i += 1
+        yield [c1, c2, c3]
 
 def main():
 
@@ -29,15 +48,27 @@ def main():
     else:
         n_plots = 1
     fig, axes = plt.subplots(1, n_plots)
-    for ssvm, file_name in zip(ssvms, args.pickles):
+
+    # find best dual value among all objectives
+    best_dual = -np.inf
+    for ssvm in ssvms:
+        if hasattr(ssvm, 'dual_objective_curve_'):
+            best_dual = max(best_dual, np.max(ssvm.dual_objective_curve_))
+    if not np.isfinite(best_dual):
+        best_dual = None
+
+
+    for i, (ssvm, file_name, color) in enumerate(zip(ssvms, args.pickles, get_color(1))):
         prefix = ""
         if len(ssvms) > 1:
             prefix = file_name[:-7] + " "
-        plot_learning(ssvm, axes=axes, prefix=prefix, time=args.time)
+        plot_learning(ssvm, axes=axes, prefix=prefix, time=args.time,
+                      color=color, suboptimality=best_dual)
     plt.show()
 
 
-def plot_learning(ssvm, time=True, axes=None, prefix=""):
+def plot_learning(ssvm, time=True, axes=None, prefix="", color=None,
+    show_caching=False, suboptimality=None):
     """Plot optimization curves and cache hits.
 
     Create a plot summarizing the optimization / learning process of an SSVM.
@@ -57,6 +88,16 @@ def plot_learning(ssvm, time=True, axes=None, prefix=""):
     prefix : string, default=""
         Prefix for legend.
 
+    color : matplotlib color.
+        Color for the plots.
+
+    show_caching : bool, default=False
+        Whether to include iterations using cached inference in 1-slack ssvm.
+
+    suboptimality : float or None, default=None
+        If a float is given, only plot primal suboptimality with respect to
+        this optimum.
+
     Notes
     -----
     Warm-starting a model might mess up the alignment of the curves.
@@ -67,6 +108,23 @@ def plot_learning(ssvm, time=True, axes=None, prefix=""):
     if hasattr(ssvm, 'base_ssvm'):
         ssvm = ssvm.base_ssvm
 
+    inference_run = None
+    ssvm.timestamps_ = np.array(ssvm.timestamps_)
+    primal_objective_curve = np.array(ssvm.primal_objective_curve_)
+    if suboptimality is not None:
+        primal_objective_curve -= suboptimality
+    if hasattr(ssvm, 'cached_constraint_') and np.any(ssvm.cached_constraint_):
+        # we don't want to do this if there was no constraint caching
+        inference_run = ~np.array(ssvm.cached_constraint_)
+        if show_caching:
+            pass
+        else:
+            ssvm.dual_objective_curve_ = np.array(ssvm.dual_objective_curve_)[inference_run]
+            primal_objective_curve = primal_objective_curve[inference_run]
+            ssvm.timestamps_ = [ssvm.timestamps_[0]] + ssvm.timestamps_[1:][inference_run]
+    else:
+        show_caching = False
+
     if hasattr(ssvm, 'iterations_'):
         # BCFW remembers when we computed the objective
         iterations = ssvm.iterations_
@@ -74,15 +132,10 @@ def plot_learning(ssvm, time=True, axes=None, prefix=""):
         iterations = np.arange(len(ssvm.dual_objective_curve_))
         print("Dual Objective: %f" % ssvm.dual_objective_curve_[-1])
     else:
-        iterations = np.arange(len(ssvm.primal_objective_curve_))
-        print("Primal Objective: %f" % ssvm.primal_objective_curve_[-1])
+        iterations = np.arange(len(primal_objective_curve))
+        print("Primal Objective: %f" % primal_objective_curve[-1])
 
     print("Iterations: %d" % (np.max(iterations) + 1))  # we count from 0
-    inference_run = None
-    if hasattr(ssvm, 'cached_constraint_'):
-        if np.any(ssvm.cached_constraint_):
-            # we don't want to do this if there was no constraint caching
-            inference_run = ~np.array(ssvm.cached_constraint_)
     if hasattr(ssvm, "loss_curve_"):
         n_plots = 2
     else:
@@ -101,18 +154,16 @@ def plot_learning(ssvm, time=True, axes=None, prefix=""):
         inds = iterations
 
     axes[0].set_title("Objective")
-    if hasattr(ssvm, "dual_objective_curve_"):
-        axes[0].plot(inds, ssvm.dual_objective_curve_, '--', label=prefix + "dual objective")
-        axes[0].set_yscale('log')
-    if hasattr(ssvm, "primal_objective_curve_"):
-        axes[0].plot(inds, ssvm.primal_objective_curve_,
-                     label=prefix + "cached primal objective" if inference_run is not None
-                     else prefix + "primal objective")
-    if inference_run is not None:
-        inference_run = inference_run[:len(ssvm.dual_objective_curve_)]
+    axes[0].set_yscale('log')
+    if hasattr(ssvm, "dual_objective_curve_") and suboptimality is None:
+        axes[0].plot(inds, ssvm.dual_objective_curve_, '--', label=prefix + "dual objective", color=color, linewidth=3)
+    axes[0].plot(inds, primal_objective_curve,
+                 label=prefix + "cached primal objective" if inference_run is not None
+                 else prefix + "primal objective", color=color, linewidth=3)
+    if show_caching:
         axes[0].plot(inds[inference_run],
-                     np.array(ssvm.primal_objective_curve_)[inference_run],
-                     'o', label=prefix + "primal")
+                     primal_objective_curve[inference_run], 'o', label=prefix +
+                     "primal", color=color)
     axes[0].legend(loc='best')
     if n_plots == 2:
         if time:
@@ -121,9 +172,9 @@ def plot_learning(ssvm, time=True, axes=None, prefix=""):
             axes[1].set_xlabel('Passes through training data')
 
         try:
-            axes[1].plot(inds[::ssvm.show_loss_every], ssvm.loss_curve_)
+            axes[1].plot(inds[::ssvm.show_loss_every], ssvm.loss_curve_, color=color)
         except:
-            axes[1].plot(ssvm.loss_curve_)
+            axes[1].plot(ssvm.loss_curve_, color=color)
 
         axes[1].set_title("Training Error")
         axes[1].set_yscale('log')
