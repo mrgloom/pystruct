@@ -186,7 +186,7 @@ class FrankWolfeSSVM(BaseSSVM):
             l = (1.0 - gamma) * l + gamma * ls
 
             if self.logger is not None:
-                self.logger(self, k)
+                self.logger(self, X, Y, k)
 
             if dual_gap < self.tol:
                 return
@@ -251,8 +251,6 @@ class FrankWolfeSSVM(BaseSSVM):
                     self.w = w
                 k += 1
 
-            if self.logger is not None:
-                self.logger(self, p)
             if (self.check_dual_every != 0) and (p % self.check_dual_every == 0):
                 dual_val, dual_gap, primal_val = self._calc_dual_gap(X, Y, l)
                 self.primal_objective_curve_.append(primal_val)
@@ -262,8 +260,12 @@ class FrankWolfeSSVM(BaseSSVM):
                 if self.verbose > 0:
                     print("dual: %f, dual_gap: %f, primal: %f"
                           % (dual_val, dual_gap, primal_val))
-                if dual_gap < self.tol:
-                    return
+
+            if self.logger is not None:
+                self.logger(self, X, Y, p)
+
+            if dual_gap < self.tol:
+                return
 
     def fit(self, X, Y, constraints=None, initialize=True):
         """Learn parameters using (block-coordinate) Frank-Wolfe learning.
@@ -304,6 +306,6 @@ class FrankWolfeSSVM(BaseSSVM):
         if hasattr(self, "iterations_"):
             self.iterations_.append(self._iteration)
         if self.logger is not None:
-            self.logger(self, 'final')
+            self.logger(self, X, Y, 'final')
 
         return self

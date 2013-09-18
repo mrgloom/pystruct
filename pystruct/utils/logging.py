@@ -1,5 +1,5 @@
 import cPickle
-
+from time import time
 
 class SaveLogger(object):
     """Logging class that stores the model periodically.
@@ -13,24 +13,25 @@ class SaveLogger(object):
         File in which the model will be stored. If the string contains
         '%d', this will be replaced with the current iteration.
 
-    save_every : int (default=10)
+    log_every : int (default=10)
         How often the model should be stored (in iterations).
 
     verbose : int (default=0)
         Verbosity level.
 
     """
-    def __init__(self, file_name, save_every=10, verbose=0):
+    def __init__(self, file_name, log_every=10, verbose=0):
         self.file_name = file_name
-        self.save_every = save_every
+        self.log_every = log_every
         self.verbose = verbose
 
     def __repr__(self):
-        return ('%s(file_name="%s", save_every=%s)'
-                % (self.__class__.__name__, self.file_name, self.save_every))
+        log_every = getattr(self, "log_every", self.save_every)
+        return ('%s(file_name="%s", log_every=%s)'
+                % (self.__class__.__name__, self.file_name, log_every))
 
-    def __call__(self, learner, iteration=0):
-        """Save learner if iterations is a multiple of save_every or "final".
+    def __call__(self, learner, X, Y, iteration=0):
+        """Save learner if iterations is a multiple of log_every or "final".
 
         Parameters
         ----------
@@ -38,10 +39,10 @@ class SaveLogger(object):
             Learning object to be saved.
 
         iteration : int or 'final' (default=0)
-            If 'final' or save_every % iteration == 0,
+            If 'final' or log_every % iteration == 0,
             the model will be saved.
         """
-        if iteration == 'final' or not iteration % self.save_every:
+        if iteration == 'final' or not iteration % self.log_every:
             file_name = self.file_name
             if "%d" in file_name:
                 file_name = file_name % iteration
@@ -62,3 +63,44 @@ class SaveLogger(object):
         with open(self.file_name, "rb") as f:
             learner = cPickle.load(f)
         return learner
+
+class AnalysisLogger(SaveLogger):
+    """Log everything. """
+    def __init__(self, file_name, log_every=10, verbose=0, compute_primal=True,
+                 compute_loss=True, compute_dual=True):
+        SaveLogger.__init__(self, file_name=file_name, log_every=log_every,
+                            verbose=verbose)
+        self.compute_primal = compute_primal
+        self.compute_loss = compute_loss
+        self.primal_objective_ = []
+        self.dual_objective_ = []
+        self.timestamps_ = []
+        self.loss_ = []
+        self.init_time_ = time()
+
+    def __repr__(self):
+        return ('%s(file_name="%s", log_every=%s)'
+                % (self.__class__.__name__, self.file_name, self.log_every))
+
+    def __call__(self, learner, X, Y, iteration=0):
+        """Save learner if iterations is a multiple of log_every or "final".
+
+        Parameters
+        ----------
+        learner : object
+            Learning object to be saved.
+
+        iteration : int or 'final' (default=0)
+            If 'final' or log_every % iteration == 0,
+            the model will be saved.
+        """
+        if iteration == 'final' or not iteration % self.log_every:
+            self.timestamps_.append(time() - self.init_time_)
+            if self.compute_primal:
+                self.primal_objective_.append(learner._objective(X, Y))
+            if hasattr(learner, 'dual_objective_curve_'):
+                self.dual_objective_.append(learner.dual_objective_curve_[-1])
+            if self.compute_loss:
+                self.loss_.append(learner.model.batch_loss(Y, learner.predict(X)))
+
+        SaveLogger.__call__(self, learner, X, Y, iteration=iteration)
