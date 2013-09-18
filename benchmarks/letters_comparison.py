@@ -31,7 +31,7 @@ nslack_every = NSlackSSVM(model, C=.1, tol=.1, verbose=3, batch_size=1)
 oneslack = OneSlackSSVM(model, C=.1, tol=.1, verbose=3)
 oneslack_cache = OneSlackSSVM(model, C=.1, tol=.1, inference_cache=50, verbose=3)
 
-svms = [bcfw, pystructsgd, oneslack, oneslack_cache, pegasos, nslack, pegasos, nslack_every]
+svms = [bcfw, pystructsgd, oneslack, oneslack_cache, pegasos, nslack, nslack_every]
 names = ['bcfw', 'pystructsgd_momentum', "oneslack", "oneslack_cache", "pegasos", "nslack", "nslack_every"]
 
 print(len(X))
