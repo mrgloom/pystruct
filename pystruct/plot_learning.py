@@ -36,6 +36,9 @@ def main():
     parser.add_argument('--time', dest='time', action='store_const',
                         const=True, default=False, help='Plot against '
                        'wall-clock time (default: plot against iterations.)')
+    parser.add_argument('--dual', dest='dual', action='store_const',
+                        const=True, default=False, help='Plot primal and dual '
+                       'values (default: plot primal suboptimality.)')
 
     args = parser.parse_args()
 
@@ -50,11 +53,12 @@ def main():
     fig, axes = plt.subplots(1, n_plots)
 
     # find best dual value among all objectives
-    best_dual = -np.inf
-    for ssvm in ssvms:
-        if hasattr(ssvm, 'dual_objective_curve_'):
-            best_dual = max(best_dual, np.max(ssvm.dual_objective_curve_))
-    if not np.isfinite(best_dual):
+    if not args.dual:
+        best_dual = -np.inf
+        for ssvm in ssvms:
+            if hasattr(ssvm, 'dual_objective_curve_'):
+                best_dual = max(best_dual, np.max(ssvm.dual_objective_curve_))
+    if args.dual or not np.isfinite(best_dual):
         best_dual = None
 
 
